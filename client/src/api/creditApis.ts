@@ -1,6 +1,6 @@
 import type { CreditReport, ReportStats, ApiResponse, UploadResponse } from '../types/credit';
 
-const API_BASE = "http://localhost:5000/api/credit";
+const API_BASE = "https://creditseaassignment.onrender.com/api/credit";
 
 export const creditApi = {
   // Fetch all reports
