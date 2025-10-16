@@ -27,90 +27,77 @@ export interface ParsedCreditData {
 
 export const parseXMLFile = (xmlContent: string): Promise<ParsedCreditData> => {
   return new Promise((resolve, reject) => {
-    parseString(xmlContent, { explicitArray: false }, (err, result) => {
-      if (err) {
-        reject(new Error('Failed to parse XML file'));
-        return;
-      }
+    parseString(xmlContent, { explicitArray: false, mergeAttrs: true }, (err, result) => {
+      if (err) return reject(new Error('Invalid XML format'));
 
       try {
-        const data = extractCreditData(result);
-        resolve(data);
+        resolve(extractCreditData(result));
       } catch (error) {
-        reject(new Error('Failed to extract data from XML'));
+        reject(new Error('Failed to extract XML data'));
       }
     });
   });
 };
 
+const get = (obj: any, path: string, fallback: any = null): any => {
+  try {
+    return path.split('.').reduce((o, key) => (o && o[key] !== undefined ? o[key] : fallback), obj);
+  } catch {
+    return fallback;
+  }
+};
+
+
 const extractCreditData = (xmlObj: any): ParsedCreditData => {
+  const root = xmlObj?.INProfileResponse || xmlObj?.CreditReport || xmlObj;
 
-  const inquiry = xmlObj?.CreditReport?.Header?.Inquiry || xmlObj?.INProfileResponse?.UserInfo || {};
-  const scoreSeg = xmlObj?.CreditReport?.Score || xmlObj?.INProfileResponse?.ScoreSegment || {};
-  const accounts = xmlObj?.CreditReport?.Accounts?.Account || xmlObj?.INProfileResponse?.CAIS?.CAIS_Account?.CAIS_Account_DETAILS || [];
-  const addresses = xmlObj?.CreditReport?.Addresses?.Address || xmlObj?.INProfileResponse?.UserInfo?.Addresses?.Address || [];
-  const enquiries = xmlObj?.CreditReport?.Enquiries?.Enquiry || xmlObj?.INProfileResponse?.CAPS?.CAPS_Application_Details || [];
+  const applicant = get(root, 'Current_Application.Current_Application_Details.Current_Applicant_Details', {});
+  const name =
+    `${applicant.First_Name || ''} ${applicant.Last_Name || ''}`.trim() ||
+    get(root, 'UserInfo.PersonName', 'Unknown');
+  const mobilePhone = applicant.MobilePhoneNumber || get(root, 'UserInfo.MobilePhone', 'N/A');
 
-  // Parse accounts
-  const accountsArray = Array.isArray(accounts) ? accounts : [accounts];
-  const creditAccounts = accountsArray.filter(Boolean).map((acc: any) => ({
-    accountType: acc.AccountType || acc.Account_Type || 'Unknown',
-    bank: acc.InstitutionName || acc.Subscriber_Name || 'Unknown',
-    accountNumber: acc.AccountNumber || acc.Account_Number || 'N/A',
-    currentBalance: parseFloat(acc.CurrentBalance || acc.Current_Balance || '0'),
-    amountOverdue: parseFloat(acc.AmountOverdue || acc.Amount_Overdue || '0'),
-    status: acc.AccountStatus || acc.Account_Status || 'Unknown'
+  const pan =
+    get(root, 'CAIS_Account.CAIS_Account_DETAILS.0.CAIS_Holder_Details.Income_TAX_PAN', 'N/A');
+
+  const creditScore = parseInt(get(root, 'SCORE.BureauScore', '0'));
+
+  const summary = get(root, 'CAIS_Account.CAIS_Summary', {});
+  const reportSummary = {
+    totalAccounts: parseInt(get(summary, 'Credit_Account.CreditAccountTotal', '0')),
+    activeAccounts: parseInt(get(summary, 'Credit_Account.CreditAccountActive', '0')),
+    closedAccounts: parseInt(get(summary, 'Credit_Account.CreditAccountClosed', '0')),
+    currentBalanceAmount: parseInt(get(summary, 'Total_Outstanding_Balance.Outstanding_Balance_All', '0')),
+    securedAccountsAmount: parseInt(get(summary, 'Total_Outstanding_Balance.Outstanding_Balance_Secured', '0')),
+    unsecuredAccountsAmount: parseInt(get(summary, 'Total_Outstanding_Balance.Outstanding_Balance_UnSecured', '0')),
+    last7DaysEnquiries: parseInt(get(root, 'TotalCAPS_Summary.TotalCAPSLast7Days', '0')),
+  };
+
+  const accountData = get(root, 'CAIS_Account.CAIS_Account_DETAILS', []);
+  const accountArray = Array.isArray(accountData) ? accountData : [accountData];
+  const creditAccounts = accountArray.map((acc: any) => ({
+    accountType: acc.Account_Type || 'Unknown',
+    bank: acc.Subscriber_Name || 'Unknown',
+    accountNumber: acc.Account_Number || 'N/A',
+    currentBalance: parseInt(acc.Current_Balance || '0'),
+    amountOverdue: parseInt(acc.Amount_Past_Due || '0'),
+    status: acc.Account_Status || 'Unknown',
   }));
 
-  // Parse addresses
-  const addressesArray = Array.isArray(addresses) ? addresses : [addresses];
-  const addressList = addressesArray.filter(Boolean).map((addr: any) => {
-    if (typeof addr === 'string') return addr;
-    return `${addr.AddressLine1 || ''} ${addr.AddressLine2 || ''} ${addr.City || ''} ${addr.State || ''} ${addr.PinCode || ''}`.trim();
-  });
-
-  // calculate summary
-  const activeAccounts = creditAccounts.filter(acc =>
-    acc.status.toLowerCase().includes('active') || acc.status === '11'
-  ).length;
-  const closedAccounts = creditAccounts.filter(acc =>
-    acc.status.toLowerCase().includes('closed') || acc.status === '13'
-  ).length;
-  const currentBalanceAmount = creditAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
-
-  // Secured accounts typically home loans, auto loans, gold loans
-  const securedTypes = ['home', 'auto', 'vehicle', 'gold', 'property', 'secured'];
-  const securedAccountsAmount = creditAccounts
-    .filter(acc => securedTypes.some(type => acc.accountType.toLowerCase().includes(type)))
-    .reduce((sum, acc) => sum + acc.currentBalance, 0);
-
-  const unsecuredAccountsAmount = currentBalanceAmount - securedAccountsAmount;
-
-  // parse enquiries in last 7 days
-  const enquiriesArray = Array.isArray(enquiries) ? enquiries : [enquiries];
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const last7DaysEnquiries = enquiriesArray.filter((enq: any) => {
-    const dateStr = enq.EnquiryDate || enq.Date_of_Request || '';
-    if (!dateStr) return false;
-    const enquiryDate = new Date(dateStr);
-    return enquiryDate >= sevenDaysAgo;
-  }).length;
+  const addr = get(root, 'CAIS_Account.CAIS_Account_DETAILS.0.CAIS_Holder_Address_Details', {});
+  const addresses = [
+    `${addr.First_Line_Of_Address_non_normalized || ''}, ${addr.City_non_normalized || ''}, ${
+      addr.ZIP_Postal_Code_non_normalized || ''
+    }`.trim(),
+  ];
 
   return {
-    name: inquiry.Name || inquiry.PersonName || 'Unknown',
-    mobilePhone: inquiry.MobilePhone || inquiry.MobileTelephoneNumber || 'N/A',
-    pan: inquiry.PAN || inquiry.InquiryPAN || 'N/A',
-    creditScore: parseInt(scoreSeg.Score || scoreSeg.BureauScore || '0'),
-    reportSummary: {
-      totalAccounts: creditAccounts.length,
-      activeAccounts,
-      closedAccounts,
-      currentBalanceAmount,
-      securedAccountsAmount,
-      unsecuredAccountsAmount,
-      last7DaysEnquiries
-    },
+    name,
+    mobilePhone,
+    pan,
+    creditScore,
+    reportSummary,
     creditAccounts,
-    addresses: addressList
+    addresses,
   };
 };

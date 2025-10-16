@@ -31,6 +31,7 @@ router.post('/upload', upload.single('xmlFile'), async (req: Request, res: Respo
 
     const xmlContent = req.file.buffer.toString('utf-8');
     const parsedData = await parseXMLFile(xmlContent);
+    console.log('Parsed Data:', parsedData);
 
     const creditReport = new CreditReport(parsedData);
     await creditReport.save();
