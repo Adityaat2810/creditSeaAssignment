@@ -1,65 +1,62 @@
-import type { CreditReport, ReportStats, ApiResponse, UploadResponse } from "../types/credit";
+import type { CreditReport, ReportStats, ApiResponse, UploadResponse } from '../types/credit';
 
 const API_BASE = "http://localhost:5000/api/credit";
 
-class CreditService {
-  async uploadFile(file: File): Promise<ApiResponse<UploadResponse>> {
+export const creditApi = {
+  // Fetch all reports
+  async fetchReports(): Promise<CreditReport[]> {
+    const res = await fetch(`${API_BASE}/reports`);
+    const data: ApiResponse<CreditReport[]> = await res.json();
+    if (data.success && data.data) {
+      return data.data;
+    }
+    throw new Error(data.message || 'Failed to fetch reports');
+  },
+
+  // Fetch overview statistics
+  async fetchStats(): Promise<ReportStats> {
+    const res = await fetch(`${API_BASE}/stats/overview`);
+    const data: ApiResponse<ReportStats> = await res.json();
+    if (data.success && data.data) {
+      return data.data;
+    }
+    throw new Error(data.message || 'Failed to fetch stats');
+  },
+
+  // Upload XML file
+  async uploadReport(file: File): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append("xmlFile", file);
 
-    const response = await fetch(`${API_BASE}/upload`, {
+    const res = await fetch(`${API_BASE}/upload`, {
       method: "POST",
       body: formData,
     });
-
-    if (!response.ok) {
-      throw new Error("Upload failed");
+    const data: ApiResponse<UploadResponse> = await res.json();
+    if (data.success && data.data) {
+      return data.data;
     }
+    throw new Error(data.message || 'Upload failed');
+  },
 
-    return response.json();
-  }
-
-  async getAllReports(): Promise<ApiResponse<CreditReport[]>> {
-    const response = await fetch(`${API_BASE}/reports`);
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch reports");
+  // Fetch single report details
+  async fetchReportDetails(reportId: string): Promise<CreditReport> {
+    const res = await fetch(`${API_BASE}/reports/${reportId}`);
+    const data: ApiResponse<CreditReport> = await res.json();
+    if (data.success && data.data) {
+      return data.data;
     }
+    throw new Error(data.message || 'Failed to fetch report details');
+  },
 
-    return response.json();
-  }
-
-  async getReportById(id: string): Promise<ApiResponse<CreditReport>> {
-    const response = await fetch(`${API_BASE}/reports/${id}`);
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch report");
-    }
-
-    return response.json();
-  }
-
-  async deleteReport(id: string): Promise<ApiResponse<void>> {
-    const response = await fetch(`${API_BASE}/reports/${id}`, {
+  // Delete report
+  async deleteReport(reportId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/reports/${reportId}`, {
       method: "DELETE",
     });
-
-    if (!response.ok) {
-      throw new Error("Failed to delete report");
+    const data: ApiResponse<void> = await res.json();
+    if (!data.success) {
+      throw new Error(data.message || 'Delete failed');
     }
-
-    return response.json();
   }
-
-  async getStats(): Promise<ApiResponse<ReportStats>> {
-    const response = await fetch(`${API_BASE}/stats/overview`);
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch statistics");
-    }
-
-    return response.json();
-  }
-}
-
-export const creditService = new CreditService();
+};
