@@ -1,0 +1,19 @@
+{
+  "name": "tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "setup.js",
+  "scripts": {
+    "test": "jest tests/backend/ --verbose",
+    "test:api": "jest tests/backend/creditApis.test.js",
+    "test:upload": "jest tests/backend/fileUpload.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4"
+  }
+}

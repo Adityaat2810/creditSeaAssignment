@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { CreditReport } from '../models/CreditReport';
-import { parseXMLFile } from '../services/xmlPareser';
+import { parseXMLFile } from '../services/xmlParser';
 
 const router = express.Router();
 
@@ -19,7 +19,6 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-// Upload and process XML file
 router.post('/upload', upload.single('xmlFile'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
@@ -31,7 +30,6 @@ router.post('/upload', upload.single('xmlFile'), async (req: Request, res: Respo
 
     const xmlContent = req.file.buffer.toString('utf-8');
     const parsedData = await parseXMLFile(xmlContent);
-    console.log('Parsed Data:', parsedData);
 
     const creditReport = new CreditReport(parsedData);
     await creditReport.save();
@@ -54,7 +52,6 @@ router.post('/upload', upload.single('xmlFile'), async (req: Request, res: Respo
   }
 });
 
-// Get all credit reports (list)
 router.get('/reports', async (req: Request, res: Response) => {
   try {
     const reports = await CreditReport.find()
@@ -75,7 +72,6 @@ router.get('/reports', async (req: Request, res: Response) => {
   }
 });
 
-// Get single credit report by ID
 router.get('/reports/:id', async (req: Request, res: Response) => {
   try {
     const report = await CreditReport.findById(req.params.id);
@@ -100,7 +96,6 @@ router.get('/reports/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Delete a credit report
 router.delete('/reports/:id', async (req: Request, res: Response) => {
   try {
     const report = await CreditReport.findByIdAndDelete(req.params.id);
@@ -125,7 +120,6 @@ router.delete('/reports/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Get report statistics
 router.get('/stats/overview', async (req: Request, res: Response) => {
   try {
     const totalReports = await CreditReport.countDocuments();

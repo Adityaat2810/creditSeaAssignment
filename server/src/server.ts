@@ -2,7 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import creditRoutes from '../routes/creditRoutes';
+import creditRoutes from './routes/creditRoutes';
 
 dotenv.config();
 
@@ -44,3 +44,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+export default app;
