@@ -1,19 +1,5 @@
-
-import './App.css'
-import { Button } from './components/ui/button'
-
-function App() {
-
-  return (
-    <>
-      <div className='bg-red-800'>
-        hey
-      </div>
-      <Button>
-        hey bhai
-      </Button>
-    </>
-  )
+export default function App(){
+  return <div>
+    wlcome to credit sea assignment
+  </div>
 }
-
-export default App
